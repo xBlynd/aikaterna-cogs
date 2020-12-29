@@ -55,6 +55,8 @@ retrosign - A v3 port of Anismash's retrosign cog.
 
 rndstatus - A v3 port of Twentysix's rndstatus cog with a couple extra settings.
 
+rss - Will's RSS cog ported for v3 with a lot of extra bells and whistles.
+
 snacktime - A v3 port of irdumb's snacktime cog. Now with friends!
 
 timezone - A v3 port of Fishyfing's timezone cog with a few improvements.
@@ -62,6 +64,8 @@ timezone - A v3 port of Fishyfing's timezone cog with a few improvements.
 trickortreat - A trick or treat-based competitive candy eating game with a leaderboard and other fun commands like stealing candy from guildmates.
 
 tools - A collection of mod and admin tools, ported from my v2 version. Sitryk is responsible for a lot of the code in tools... thanks for the help with this cog.
+
+ttt - A Tic Tac Toe cog originally for Red V2 by HizikiFW. This cog is licensed under the Apache-2.0 license.
 
 warcraftlogs - Fetch player info/metrics from the WarcraftLogs API for World of Warcraft Classic. Does not provide stats for non-Classic characters.
 

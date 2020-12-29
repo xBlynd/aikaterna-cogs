@@ -72,8 +72,10 @@ class Dungeon(commands.Cog):
         if not dungeon_role_obj:
             return await ctx.send("No dungeon role set.")
 
+        #Managed roles CANNOT be removed by the bot.
+        remaining_roles = [r for r in user.roles if r.managed]
         try:
-            await user.edit(roles=[], reason=f"Removing all roles, {ctx.message.author} is banishing user")
+            await user.edit(roles=remaining_roles, reason=f"Removing all roles, {ctx.message.author} is banishing user")
         except discord.Forbidden:
             return await ctx.send(
                 "I need permission to manage roles or the role hierarchy might not allow me to do this. I need a role higher than the person you're trying to banish."
@@ -386,7 +388,11 @@ class Dungeon(commands.Cog):
             return
         if member.avatar_url == member.default_avatar_url:
             default_avatar = True
-        join_date = datetime.datetime.strptime(str(member.created_at), "%Y-%m-%d %H:%M:%S.%f")
+        try:
+            join_date = datetime.datetime.strptime(str(member.created_at), "%Y-%m-%d %H:%M:%S.%f")
+        except ValueError:
+            member_created_at = f"{str(member.created_at)}.0"
+            join_date = datetime.datetime.strptime(member_created_at, "%Y-%m-%d %H:%M:%S.%f")
         now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         since_join = now - join_date
         join_days = await self.config.guild(member.guild).join_days()

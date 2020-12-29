@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import discord
 import inspect
+import itertools
 import logging
 import re
 from redbot.core import checks, commands
@@ -97,7 +98,8 @@ class Tools(commands.Cog):
             len(author_only_v), ", ".join([c.name for c in author_only_v])
         )
         msg += "```"
-        await ctx.send(msg)
+        for page in cf.pagify(msg, delims=["\n"], shorten_by=16):
+            await ctx.send(page)
 
     @access.command()
     async def text(self, ctx, user: discord.Member = None, guild: int = None):
@@ -122,7 +124,8 @@ class Tools(commands.Cog):
 
         msg += "[ACCESS]:\n{}\n\n".format(", ".join(can_access))
         msg += "[NO ACCESS]:\n{}\n```".format(", ".join(list(set(text_channels) - set(can_access))))
-        await ctx.send(msg)
+        for page in cf.pagify(msg, delims=["\n"], shorten_by=16):
+            await ctx.send(page)
 
     @access.command()
     async def voice(self, ctx, user: discord.Member = None, guild: int = None):
@@ -147,7 +150,8 @@ class Tools(commands.Cog):
 
         msg += "[ACCESS]:\n{}\n\n".format(", ".join(can_access))
         msg += "[NO ACCESS]:\n{}\n```".format(", ".join(list(set(voice_channels) - set(can_access))))
-        await ctx.send(msg)
+        for page in cf.pagify(msg, delims=["\n"], shorten_by=16):
+            await ctx.send(page)
 
     @commands.guild_only()
     @commands.command()
@@ -186,12 +190,16 @@ class Tools(commands.Cog):
 
     @commands.guild_only()
     @commands.command()
-    async def cinfo(self, ctx, channel: int = None):
+    async def chinfo(self, ctx, channel: int = None):
         """Shows channel information. Defaults to current text channel."""
         if channel is None:
             channel = ctx.channel
         else:
             channel = self.bot.get_channel(channel)
+
+        if channel is None:
+            return await ctx.send("Not a valid channel.")
+
         if channel:
             guild = channel.guild
 
@@ -476,7 +484,7 @@ class Tools(commands.Cog):
         perms = iter(ctx.channel.permissions_for(user))
         perms_we_have = ""
         perms_we_dont = ""
-        for x in perms:
+        for x in sorted(perms):
             if "True" in str(x):
                 perms_we_have += "+\t{0}\n".format(str(x).split("'")[1])
             else:
@@ -521,7 +529,7 @@ class Tools(commands.Cog):
             perms = iter(role.permissions)
             perms_we_have = ""
             perms_we_dont = ""
-            for x in perms:
+            for x in sorted(perms):
                 if "True" in str(x):
                     perms_we_have += "{0}\n".format(str(x).split("'")[1])
                 else:
@@ -543,8 +551,8 @@ class Tools(commands.Cog):
             em.add_field(name="ID", value=role.id)
             em.add_field(name="Color", value=role.color)
             em.add_field(name="Position", value=role.position)
-            em.add_field(name="Valid Permissons", value="{}".format(perms_we_have))
-            em.add_field(name="Invalid Permissons", value="{}".format(perms_we_dont))
+            em.add_field(name="Valid Permissions", value="{}".format(perms_we_have))
+            em.add_field(name="Invalid Permissions", value="{}".format(perms_we_dont))
             em.set_thumbnail(url=role.guild.icon_url)
         try:
             await loadingmsg.edit(embed=em)
@@ -558,7 +566,7 @@ class Tools(commands.Cog):
                 perms = iter(role.permissions)
                 perms_we_have2 = ""
                 perms_we_dont2 = ""
-                for x in perms:
+                for x in sorted(perms):
                     if "True" in str(x):
                         perms_we_have2 += "+{0}\n".format(str(x).split("'")[1])
                     else:
@@ -633,7 +641,7 @@ class Tools(commands.Cog):
         else:
             try:
                 guild = self.bot.get_guild(int(guild))
-            except TypeError:
+            except ValueError:
                 return await ctx.send("Not a valid guild id.")
         online = str(len([m.status for m in guild.members if str(m.status) == "online" or str(m.status) == "idle"]))
         total_users = str(len(guild.members))
@@ -661,18 +669,19 @@ class Tools(commands.Cog):
     @commands.command()
     async def uinfo(self, ctx, user: discord.Member = None):
         """Shows user information. Defaults to author."""
-        with sps(discord.Forbidden):
-            await ctx.message.delete()
-
         if user is None:
             user = ctx.author
 
         with sps(Exception):
             caller = inspect.currentframe().f_back.f_code.co_name
 
-        roles = [x.name for x in user.roles if x.name != "@everyone"]
-        if not roles:
-            roles = ["None"]
+        try:
+            roles = [r for r in user.roles if r.name != "@everyone"]
+            _roles = [roles[0].name,] + [f'{r.name:>{len(r.name)+17}}' for r in roles[1:]]
+        except IndexError:
+            # if there are no roles then roles[0] will raise the IndexError here
+            _roles = ["None"]
+
         seen = str(len(set([member.guild.name for member in self.bot.get_all_members() if member.id == user.id])))
 
         load = "```\nLoading user info...```"
@@ -680,8 +689,6 @@ class Tools(commands.Cog):
 
         data = "```ini\n"
         data += "[Name]:          {}\n".format(cf.escape(str(user)))
-        if user.nick is not None:
-            data += "[Nickname]:      {}\n".format(cf.escape(str(user.nick)))
         data += "[ID]:            {}\n".format(user.id)
         data += "[Status]:        {}\n".format(user.status)
         data += "[Servers]:       {} shared\n".format(seen)
@@ -705,7 +712,9 @@ class Tools(commands.Cog):
         joined_at = self.fetch_joined_at(user, ctx.guild)
         if caller != "invoke":
             data += "[Joined]:        {}\n".format(self._dynamic_time(joined_at))
-            data += "[Roles]:         {}\n".format(", ".join(roles))
+            data += "[Roles]:         {}\n".format("\n".join(_roles))
+            if len(_roles) > 1:
+                data += "\n"
             data += "[In Voice]:      {}\n".format(user.voice.channel if user.voice is not None else None)
             data += "[AFK]:           {}\n".format(user.voice.afk if user.voice is not None else False)
         data += "```"
@@ -744,7 +753,7 @@ class Tools(commands.Cog):
         if isinstance(it_is, discord.Guild):
             await ctx.invoke(self.sinfo, id)
         elif isinstance(it_is, discord.abc.GuildChannel):
-            await ctx.invoke(self.cinfo, id)
+            await ctx.invoke(self.chinfo, id)
         elif isinstance(it_is, (discord.User, discord.Member)):
             await ctx.invoke(self.uinfo, it_is)
         elif isinstance(it_is, discord.Role):
@@ -756,26 +765,47 @@ class Tools(commands.Cog):
 
     @staticmethod
     def _dynamic_time(time):
-        date_join = datetime.datetime.strptime(str(time), "%Y-%m-%d %H:%M:%S.%f")
+        try:
+            date_join = datetime.datetime.strptime(str(time), "%Y-%m-%d %H:%M:%S.%f")
+        except ValueError:
+            member_created_at = f"{str(member.created_at)}.0"
+            date_join = datetime.datetime.strptime(str(time), "%Y-%m-%d %H:%M:%S.%f")
         date_now = datetime.datetime.now(datetime.timezone.utc)
         date_now = date_now.replace(tzinfo=None)
         since_join = date_now - date_join
 
-        m, s = divmod(int(since_join.total_seconds()), 60)
-        h, m = divmod(m, 60)
-        d, h = divmod(h, 24)
+        mins, secs = divmod(int(since_join.total_seconds()), 60)
+        hrs, mins = divmod(mins, 60)
+        days, hrs = divmod(hrs, 24)
+        mths, wks, days = Tools._count_months(days)
+        yrs, mths = divmod(mths, 12)
 
-        if d > 0:
-            msg = "{0}d {1}h ago"
-        elif d == 0 and h > 0:
-            msg = "{1}h {2}m ago"
-        elif d == 0 and h == 0 and m > 0:
-            msg = "{2}m {3}s ago"
-        elif d == 0 and h == 0 and m == 0 and s > 0:
-            msg = "{3}s ago"
+        m = f"{yrs}y {mths}mth {wks}w {days}d {hrs}h {mins}m {secs}s"
+        m2 = [x for x in m.split() if x[0] != '0']
+        s = ' '.join(m2[:2])
+        if s:
+            return f'{s} ago'
         else:
-            msg = ""
-        return msg.format(d, h, m, s)
+            return ''
+
+    @staticmethod
+    def _count_months(days):
+        lens = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        cy = itertools.cycle(lens)
+        months = 0
+        m_temp = 0
+        mo_len = next(cy)
+        for i in range(1, days+1):
+            m_temp += 1
+            if m_temp == mo_len:
+                months += 1
+                m_temp = 0
+                mo_len = next(cy)
+                if mo_len == 28 and months >= 48:
+                    mo_len += 1
+
+        weeks, days = divmod(m_temp, 7)
+        return months, weeks, days
 
     def fetch_joined_at(self, user, guild):
         return user.joined_at
