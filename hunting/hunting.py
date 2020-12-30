@@ -28,9 +28,9 @@ class Hunting(commands.Cog):
         self.config = Config.get_conf(self, 2784481002, force_registration=True)
 
         self.animals = {
-            "dove": ":dove: **_Coo!_**",
-            "penguin": ":penguin: **_Noot!_**",
-            "chicken": ":chicken: **_Bah-gawk!_**",
+            # "dove": ":dove: **_Coo!_**",
+            # "penguin": ":penguin: **_Noot!_**",
+            # "chicken": ":chicken: **_Bah-gawk!_**",
             "duck": ":duck: **_Quack!_**",
         }
         self.in_game = []
